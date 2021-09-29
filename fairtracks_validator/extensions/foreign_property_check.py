@@ -3,10 +3,10 @@
 
 from collections import namedtuple
 
-from .abstract_check import AbstractCustomFeatureValidator
+from extended_json_schema_validator.extensions.abstract_check import AbstractCustomFeatureValidator
 
 # We need this for its class methods
-from .unique_check import UniqueKey, ALLOWED_KEY_TYPES, ALLOWED_ATOMIC_VALUE_TYPES
+from extended_json_schema_validator.extensions.unique_check import UniqueKey, ALLOWED_KEY_TYPES, ALLOWED_ATOMIC_VALUE_TYPES
 
 from jsonschema.exceptions import FormatError, ValidationError
 

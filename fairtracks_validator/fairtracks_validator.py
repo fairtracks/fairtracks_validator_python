@@ -5,13 +5,13 @@ import sys
 import os
 
 # Augmenting the supported types
-from .extensible_validator import ExtensibleValidator
+from extended_json_schema_validator.extensible_validator import ExtensibleValidator
 
 from .extensions.curie_search import CurieSearch
 from .extensions.ontology_term import OntologyTerm
-from .extensions.unique_check import UniqueKey
-from .extensions.pk_check import PrimaryKey
-from .extensions.fk_check import ForeignKey
+from extended_json_schema_validator.extensions.unique_check import UniqueKey
+from extended_json_schema_validator.extensions.pk_check import PrimaryKey
+from extended_json_schema_validator.extensions.fk_check import ForeignKey
 from .extensions.foreign_property_check import ForeignProperty
 
 class FairGTracksValidator(ExtensibleValidator):
@@ -38,4 +38,4 @@ class FairGTracksValidator(ExtensibleValidator):
 	}
 	
 	def __init__(self,customFormats=CustomFormats, customTypes=CustomTypes, customValidators=CustomValidators, config={}):
-		super().__init__(customFormats,customTypes,customValidators,config)
+		super().__init__(customFormats, customTypes, customValidators, config, jsonRootTag='fair_tracks')

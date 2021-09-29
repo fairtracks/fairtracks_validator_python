@@ -6,7 +6,7 @@ import uritools
 from jsonschema.compat import str_types
 from jsonschema.exceptions import FormatError, ValidationError
 
-from .abstract_check import AbstractCustomFeatureValidator
+from extended_json_schema_validator.extensions.abstract_check import AbstractCustomFeatureValidator
 from .curie_cache import CurieCache, Curie
 
 import re

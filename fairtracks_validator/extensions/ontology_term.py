@@ -18,7 +18,7 @@ import hashlib
 
 import json
 
-from .abstract_check import AbstractCustomFeatureValidator
+from extended_json_schema_validator.extensions.abstract_check import AbstractCustomFeatureValidator
 from ..downloader import download_file
 
 class OntologyTerm(AbstractCustomFeatureValidator):
