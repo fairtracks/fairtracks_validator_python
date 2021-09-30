@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import sys
+import logging
 import os
 import urllib
 import urllib.request
@@ -129,6 +130,8 @@ def download_file(url, local_filename, local_stats={}, compressed_mode=None):
 		if e.code == 304:
 			local_filename = None
 		else:
+			if e.code == 404:
+				logging.error(f"Unable to download {url} into {down_filename}")
 			raise e
 	finally:
 		# Anyway, updating the output stats
