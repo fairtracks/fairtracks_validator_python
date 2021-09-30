@@ -37,5 +37,5 @@ class FairGTracksValidator(ExtensibleValidator):
 		]
 	}
 	
-	def __init__(self,customFormats=CustomFormats, customTypes=CustomTypes, customValidators=CustomValidators, config={}):
-		super().__init__(customFormats, customTypes, customValidators, config, jsonRootTag='fair_tracks')
+	def __init__(self,customFormats=CustomFormats, customTypes=CustomTypes, customValidators=CustomValidators, config={}, isRW=True):
+		super().__init__(customFormats, customTypes, customValidators, config, jsonRootTag='fair_tracks', isRW=isRW)

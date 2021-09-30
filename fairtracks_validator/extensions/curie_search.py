@@ -28,8 +28,8 @@ class CurieSearch(AbstractCustomFeatureValidator):
 	KeyAttributeName = 'namespace'
 	MatchTypeAttrName = 'matchType'
 	
-	def __init__(self,schemaURI, jsonSchemaSource='(unknown)',config={}):
-		super().__init__(schemaURI,jsonSchemaSource,config)
+	def __init__(self, schemaURI, jsonSchemaSource='(unknown)', config={}, isRW=True):
+		super().__init__(schemaURI, jsonSchemaSource, config, isRW=isRW)
 	
 	@property
 	def triggerAttribute(self):
@@ -68,7 +68,7 @@ class CurieSearch(AbstractCustomFeatureValidator):
 		self.InvalidateCurieCache(cachePath=self.config.get('cacheDir'))
 	
 	def warmUpCaches(self):
-		cache = self.GetCurieCache(cachePath=self.config.get('cacheDir'))
+		cache = self.GetCurieCache(cachePath=self.config.get('cacheDir'), warmUp=self.isRW)
 	
 	@classmethod
 	def InvalidateCurieCache(cls, cachePath=None):
@@ -89,7 +89,7 @@ class CurieSearch(AbstractCustomFeatureValidator):
 		if matchType not in CurieSearch.VALID_MATCHES:
 			raise ValidationError("attribute '{0}' is {1} but it must be one of the next values: {2}".format(self.MatchTypeAttrName,matchType,CurieSearch.VALID_MATCHES.keys()))
 		
-		cache = self.GetCurieCache(cachePath=self.config.get('cacheDir'))
+		cache = self.GetCurieCache(cachePath=self.config.get('cacheDir'), warmUp=self.isRW)
 		
 		parsed = None
 		try:
@@ -184,12 +184,12 @@ class CurieSearch(AbstractCustomFeatureValidator):
 		return getattr(cls,'CurieCachePath')
 	
 	@classmethod
-	def GetCurieCache(cls, cachePath = None):
+	def GetCurieCache(cls, cachePath = None, warmUp=True):
 		if cachePath is None:
 			cachePath = cls.GetCurieCachePath(cachePath = cachePath)
 		
 		if not hasattr(cls,'CurieCache'):
-			setattr(cls,'CurieCache',CurieCache(filename=os.path.join(cachePath,'CURIE_cache.sqlite3')))
+			setattr(cls,'CurieCache',CurieCache(filename=os.path.join(cachePath,'CURIE_cache.sqlite3'), warmUp=warmUp))
 		
 		return getattr(cls,'CurieCache')
 	

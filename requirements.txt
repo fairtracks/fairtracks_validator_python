@@ -1,4 +1,4 @@
-extended-json-schema-validator >= 0.9.8
+extended-json-schema-validator >= 0.9.9
 # With 'format' several optional formats
 # are supported through additional libraries
 jsonschema[format] >= 3.0.0

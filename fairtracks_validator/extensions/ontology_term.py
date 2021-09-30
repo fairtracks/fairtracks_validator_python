@@ -37,8 +37,8 @@ class OntologyTerm(AbstractCustomFeatureValidator):
 	MatchTypeAttrName = 'matchType'
 	AncestorsAttrName = 'ancestors'
 	
-	def __init__(self,schemaURI, jsonSchemaSource='(unknown)',config={}):
-		super().__init__(schemaURI,jsonSchemaSource,config)
+	def __init__(self, schemaURI, jsonSchemaSource='(unknown)', config={}, isRW=True):
+		super().__init__(schemaURI, jsonSchemaSource, config, isRW=isRW)
 		self.ontologies = []
 	
 	@property
@@ -121,7 +121,7 @@ class OntologyTerm(AbstractCustomFeatureValidator):
 		cachePath = self.config.get('cacheDir')
 		doReasoner = self.config.get(self.KeyAttributeName,{}).get('do-reasoning',False)
 		for ontology in self.ontologies:
-			self.GetOntology(ontology, doReasoner=doReasoner, cachePath=cachePath, logger=self.logger)
+			self.GetOntology(ontology, doReasoner=doReasoner, cachePath=cachePath, logger=self.logger, warmUp=self.isRW)
 	
 	@classmethod
 	def GetCachePath(cls):
@@ -245,11 +245,11 @@ class OntologyTerm(AbstractCustomFeatureValidator):
 			
 			cls.TermWorlds.clear()
 	
-	IRI_HASH = {}
-	TermWorlds = {}
+	IRI_HASH = dict()
+	TermWorlds = dict()
 	
 	@classmethod
-	def GetOntology(cls, iri, doReasoner=False, cachePath=None, logger=logging):
+	def GetOntology(cls, iri, doReasoner=False, cachePath=None, logger=logging, warmUp=False):
 		iri_hash = cls.IRI_HASH.get(iri)
 		
 		if iri_hash is None:
@@ -261,6 +261,12 @@ class OntologyTerm(AbstractCustomFeatureValidator):
 			
 			if worldDB is None:
 				worldDBPath = cls.GetWorldDBPath(iri_hash,cachePath)
+				
+				# If the file does not exist, then it was not previously fetched
+				if not warmUp and not os.path.exists(worldDBPath):
+					errmsg = f"Ontology {iri} was not materialized"
+					logger.error(errmsg + ". Warm-up caches if needed")
+					raise ValidationError(errmsg)
 				
 				# Activate this only if you want to save a copy of the ontologies
 				#ontologiesPath = os.path.join(cachePath,'ontologies')
@@ -276,22 +282,43 @@ class OntologyTerm(AbstractCustomFeatureValidator):
 					with open(metadataPath,mode='r',encoding='utf-8') as metadata_fh:
 						metadata = json.load(metadata_fh)
 				except:
-					# A corrupted cache should not disturb
-					metadata = {}
-			else:
+					if warmUp:
+						# A corrupted cache should not disturb
+						metadata = {}
+					else:
+						errmsg = f"Ontology {iri} metadata was corrupted"
+						logger.error(errmsg + ". Please warm-up caches")
+						raise ValidationError(errmsg)
+			elif warmUp:
 				metadata = {}
+			else:
+				errmsg = f"Ontology {iri} was not properly materialized"
+				logger.error(errmsg + ". Check the URL or warm-up caches")
+				raise ValidationError(errmsg)
 			
 			ontologyPath = cls.GetOntologyPath(iri_hash,cachePath)
+			
 			gotPath = None
 			gotMetadata = None
-			try:
-				gotPath, gotMetadata = download_file(iri, ontologyPath, metadata, 'gz')
-			except urllib.error.HTTPError as he:
-				if he.code < 500:
-					raise he
-				else:
-					logger.warning("WARNING: transient error fetching {}. {}".format(iri, he))
+			
+			if warmUp:
+				try:
+					gotPath, gotMetadata = download_file(iri, ontologyPath, metadata, 'gz')
+				except urllib.error.HTTPError as he:
+					if he.code < 500:
+						raise he
+					else:
+						logger.warning("WARNING: transient error fetching {}. {}".format(iri, he))
+			elif os.path.exists(ontologyPath) and os.path.getmtime(ontologyPath) <= os.path.getmtime(metadataPath):
+				gotPath = ontologyPath
+				gotMetadata = metadata
+			
 			if gotPath:
+				if not warmUp:
+					errmsg = f"Stale copy of ontology {iri}, but it is not allowed to warm up the cache"
+					logger.error(errmsg)
+					raise ValidationError(errmsg)
+				
 				gotMetadata['orig_url'] = iri
 				opener = COMPRESS_OPEN_HASH[gotMetadata.get('compression')]
 				# Reading the ontology
@@ -299,20 +326,21 @@ class OntologyTerm(AbstractCustomFeatureValidator):
 					onto = worldDB.get_ontology(iri).load(fileobj=onto_fh,reload=True)
 				
 				# Save the metadata
-				with open(metadataPath,mode="w",encoding="utf-8") as metadata_fh:
+				with open(metadataPath, mode="w",encoding="utf-8") as metadata_fh:
 					json.dump(gotMetadata,metadata_fh)
 				
 				# Re-save once the reasoner has run
 				if doReasoner:
 					worldDB.save()
 					owlready2.sync_reasoner(onto)
+				worldDB.save()
+				
+				# And now unlink the ontology (if exists)
+				if os.path.exists(ontologyPath):
+					os.unlink(ontologyPath)
 			else:
 				onto = worldDB.get_ontology(iri).load()
-			worldDB.save()
-			
-			# And now unlink the ontology (if exists)
-			if os.path.exists(ontologyPath):
-				os.unlink(ontologyPath)
+			#worldDB.save()
 			
 			cls.ONTO_CACHE[iri_hash] = onto
 		
@@ -345,7 +373,7 @@ class OntologyTerm(AbstractCustomFeatureValidator):
 		cachePath = self.config.get('cacheDir')
 		doReasoner = self.config.get(self.KeyAttributeName,{}).get('do-reasoning',False)
 		for ontology in ontlist:
-			onto = self.GetOntology(ontology, doReasoner = doReasoner, cachePath = cachePath)
+			onto = self.GetOntology(ontology, doReasoner = doReasoner, cachePath = cachePath, warmUp=self.isRW)
 			
 			foundTerms = onto.search(**queryParams)
 			# Is the term findable with these conditions?

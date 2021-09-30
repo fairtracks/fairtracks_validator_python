@@ -4,6 +4,7 @@
 import os
 import sys
 import sqlite3
+import urllib.parse
 import urllib.request
 import json
 import logging
@@ -19,9 +20,11 @@ import collections
 
 Curie = collections.namedtuple('Curie',['id','namespace','name','pattern'])
 
+class AbstractCurieCacheException(Exception):
+	pass
 
 class AbstractCurieCache(object):
-	def __init__(self,filename='curie_cache.sqlite'):
+	def __init__(self, filename='curie_cache.sqlite', warmUp=True):
 		self.logger = logging.getLogger(self.__class__.__name__)
 		
 		existsCache = os.path.exists(filename) and (os.path.getsize(filename) > 0)
@@ -29,23 +32,31 @@ class AbstractCurieCache(object):
 		
 		# Opening / creating the database, with normal locking
 		# and date parsing
-		self.conn = sqlite3.connect(filename, detect_types=sqlite3.PARSE_DECLTYPES|sqlite3.PARSE_COLNAMES, check_same_thread = False)
+		dburi = 'file:' + urllib.parse.quote(filename)
+		if not warmUp:
+			if initializeCache:
+				raise AbstractCurieCacheException("CURIE cache was not previously warmed up")
+			dburi += '?mode=ro'
+		
+		self.conn = sqlite3.connect(dburi, detect_types=sqlite3.PARSE_DECLTYPES|sqlite3.PARSE_COLNAMES, check_same_thread = False)
 		self.conn.execute("""PRAGMA locking_mode = NORMAL""")
 		
-		# Database structures
-		with self.conn:
-			cur = self.conn.cursor()
-			self.updateDatabase = initializeCache
-			if initializeCache:
-				# Metadata table
-				cur.execute("""
+		initializeCache = not self.isStoreBootstrapped()
+		self.updateDatabase = initializeCache
+		if warmUp:
+			# Database structures
+			with self.conn:
+				cur = self.conn.cursor()
+				if initializeCache:
+					# Metadata table
+					cur.execute("""
 CREATE TABLE metadata (
 	last_generated DATETIME NOT NULL,
 	last_updated DATETIME NOT NULL
 )
 """)
-				# Prefixes table
-				cur.execute("""
+					# Prefixes table
+					cur.execute("""
 CREATE TABLE namespaces (
 	id VARCHAR(32) NOT NULL COLLATE NOCASE,
 	namespace VARCHAR(64) NOT NULL COLLATE NOCASE,
@@ -55,11 +66,26 @@ CREATE TABLE namespaces (
 )
 """)
 
-				# Index on the namespace
-				cur.execute("""
+					# Index on the namespace
+					cur.execute("""
 CREATE INDEX namespaces_namespace ON namespaces(namespace)
 """)
-			else:
+				else:
+					# Should we download 
+					cur.execute("""
+SELECT DATETIME('NOW','-7 DAYS') > last_generated
+FROM metadata
+""")
+					res = cur.fetchone()
+					if (res is None) or res[0]:
+						self.updateDatabase = True
+				cur.close()
+		elif initializeCache:
+			raise AbstractCurieCacheException("CURIE cache was not previously warmed up")
+		else:
+			self.conn.execute("""PRAGMA query_only = ON""")
+			with self.conn:
+				cur = self.conn.cursor()
 				# Should we download 
 				cur.execute("""
 SELECT DATETIME('NOW','-7 DAYS') > last_generated
@@ -67,9 +93,25 @@ FROM metadata
 """)
 				res = cur.fetchone()
 				if (res is None) or res[0]:
-					self.updateDatabase = True
-		cur.close()
-		
+					raise AbstractCurieCacheException("CURIE cache was not previously warmed up")
+				cur.close()
+
+	def isStoreBootstrapped(self) -> bool:
+		# Query to know about the number of tables.
+		# When there is no table, the store is empty
+		with self.conn:
+			cur = self.conn.cursor()
+			cur.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table'")
+			numTablesRes = cur.fetchone()
+
+			retval = False
+			if numTablesRes and numTablesRes[0] > 0:
+				self.logger.debug(f"Number of tables: {numTablesRes[0]}")
+				retval = True
+			cur.close()
+
+			return retval
+        
 	# Next methods are to emulate a dictionary
 	def __len__(self):
 		with self.conn:
@@ -145,8 +187,8 @@ class CurieCache(AbstractCurieCache):
 	REGISTRY_LINK='https://registry.api.identifiers.org'
 	REGISTRY_DUMP_LINK = REGISTRY_LINK+'/resolutionApi/getResolverDataset'
 	
-	def __init__(self,filename='curie_cache.sqlite'):
-		super().__init__(filename)
+	def __init__(self, filename='curie_cache.sqlite', warmUp=True):
+		super().__init__(filename, warmUp=warmUp)
 		
 		if self.updateDatabase:
 			cur = self.conn.cursor()
@@ -211,8 +253,8 @@ class CurieCacheClassic(AbstractCurieCache):
 	CURIE_MIRIAM_LINK='https://www.ebi.ac.uk/miriam/main/export/xml/'
 	MIRIAM_NS='http://www.biomodels.net/MIRIAM/'
 	
-	def __init__(self,filename='curie_cache.sqlite'):
-		super().__init__(filename)
+	def __init__(self, filename='curie_cache.sqlite', warmUp=True):
+		super().__init__(filename, warmUp=warmUp)
 		
 		if self.updateDatabase:
 			cur = self.conn.cursor()
