@@ -34,9 +34,13 @@ setuptools.setup(
 	author="José Mª Fernández",
 	author_email="jose.m.fernandez@bsc.es",
 	description="FAIRtracks JSON Validator",
+	license="LGPLv2",
 	long_description=long_description,
 	long_description_content_type="text/markdown",
-	url="https://github.com/fairtracks/fairtracks_validator/tree/master/python",
+	url="https://github.com/fairtracks/fairtracks_validator_python",
+	project_urls={
+		"Bug Tracker": "https://github.com/fairtracks/fairtracks_validator_python/issues"
+	},
 	packages=setuptools.find_packages(),
 	install_requires=requirements,
 	classifiers=[
@@ -44,4 +48,5 @@ setuptools.setup(
 		"License :: OSI Approved :: GNU Lesser General Public License v2 (LGPLv2)",
 		"Operating System :: OS Independent",
 	],
+	python_requires=">=3.6",
 )
