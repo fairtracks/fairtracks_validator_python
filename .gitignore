@@ -1,5 +1,6 @@
 .py*env/
 py*env/
+*CACHE/
 __pycache__
 build/
 dist/
