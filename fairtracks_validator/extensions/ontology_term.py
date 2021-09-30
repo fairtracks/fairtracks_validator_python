@@ -21,7 +21,7 @@ import json
 import logging
 
 from extended_json_schema_validator.extensions.abstract_check import AbstractCustomFeatureValidator
-from ..downloader import download_file
+from ..downloader import download_file, COMPRESS_OPEN_HASH
 
 class OntologyTerm(AbstractCustomFeatureValidator):
 	VALID_MATCHES = {
@@ -285,7 +285,7 @@ class OntologyTerm(AbstractCustomFeatureValidator):
 			gotPath = None
 			gotMetadata = None
 			try:
-				gotPath,gotMetadata = download_file(iri,ontologyPath,metadata)
+				gotPath, gotMetadata = download_file(iri, ontologyPath, metadata, 'gz')
 			except urllib.error.HTTPError as he:
 				if he.code < 500:
 					raise he
@@ -293,8 +293,9 @@ class OntologyTerm(AbstractCustomFeatureValidator):
 					logger.warning("WARNING: transient error fetching {}. {}".format(iri, he))
 			if gotPath:
 				gotMetadata['orig_url'] = iri
+				opener = COMPRESS_OPEN_HASH[gotMetadata.get('compression')]
 				# Reading the ontology
-				with open(ontologyPath,mode="rb") as onto_fh:
+				with opener(ontologyPath,mode="rb") as onto_fh:
 					onto = worldDB.get_ontology(iri).load(fileobj=onto_fh,reload=True)
 				
 				# Save the metadata
