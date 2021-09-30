@@ -7,6 +7,7 @@ from jsonschema.exceptions import FormatError, ValidationError
 
 import owlready2
 import xdg.BaseDirectory
+
 import os
 import urllib
 import urllib.error
@@ -17,6 +18,7 @@ import atexit
 import hashlib
 
 import json
+import logging
 
 from extended_json_schema_validator.extensions.abstract_check import AbstractCustomFeatureValidator
 from ..downloader import download_file
@@ -119,7 +121,7 @@ class OntologyTerm(AbstractCustomFeatureValidator):
 		cachePath = self.config.get('cacheDir')
 		doReasoner = self.config.get(self.KeyAttributeName,{}).get('do-reasoning',False)
 		for ontology in self.ontologies:
-			self.GetOntology(ontology, doReasoner=doReasoner, cachePath=cachePath)
+			self.GetOntology(ontology, doReasoner=doReasoner, cachePath=cachePath, logger=self.logger)
 	
 	@classmethod
 	def GetCachePath(cls):
@@ -247,7 +249,7 @@ class OntologyTerm(AbstractCustomFeatureValidator):
 	TermWorlds = {}
 	
 	@classmethod
-	def GetOntology(cls, iri, doReasoner=False, cachePath=None):
+	def GetOntology(cls, iri, doReasoner=False, cachePath=None, logger=logging):
 		iri_hash = cls.IRI_HASH.get(iri)
 		
 		if iri_hash is None:
@@ -288,7 +290,7 @@ class OntologyTerm(AbstractCustomFeatureValidator):
 				if he.code < 500:
 					raise he
 				else:
-					print("WARNING: transient error fetching {}. {}".format(iri, he),file=sys.stderr)
+					logger.warning("WARNING: transient error fetching {}. {}".format(iri, he))
 			if gotPath:
 				gotMetadata['orig_url'] = iri
 				# Reading the ontology
@@ -420,16 +422,16 @@ class OntologyTerm(AbstractCustomFeatureValidator):
 			except SyntaxError:
 				t,v,tr = sys.exc_info()
 				import pprint
-				pprint.pprint(t)
-				pprint.pprint(v)
-				pprint.pprint(tr)
+				self.logger.critical(pprint.pformat(t))
+				self.logger.critical(pprint.pformat(v))
+				self.logger.critical(pprint.pformat(tr))
 				sys.exit(1)
 			#except:
 			#	t,v,tr = sys.exc_info()
 			#	import pprint
-			#	pprint.pprint(t)
-			#	pprint.pprint(v)
-			#	pprint.pprint(tr)
+			#	self.logger.critical(pprint.pformat(t))
+			#	self.logger.critical(pprint.pformat(v))
+			#	self.logger.critical(pprint.pformat(tr))
 			#	sys.exit(1)
 			except ValidationError as v:
 				yield v

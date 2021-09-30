@@ -9,6 +9,7 @@ from jsonschema.exceptions import FormatError, ValidationError
 from extended_json_schema_validator.extensions.abstract_check import AbstractCustomFeatureValidator
 from .curie_cache import CurieCache, Curie
 
+import logging
 import re
 import xdg
 import os, sys
@@ -233,8 +234,7 @@ class CurieSearch(AbstractCustomFeatureValidator):
 			except ValueError as ve:
 				yield ValidationError("Unable to parse CURIE {0}: {1}".format(value,str(ve)))
 			except BaseException as be:
-				import traceback
-				traceback.print_exc()
+				self.logger.exception("Unexpected error")
 				yield ValidationError("Unexpected error: {}".format(str(be)))
 
 	@classmethod
@@ -247,6 +247,6 @@ class CurieSearch(AbstractCustomFeatureValidator):
 			curie = cls(None)
 			for val in curie.validate(None,schema.get(cls.KeyAttributeName) if schema else None,value,schema):
 				if isinstance(val,ValidationError):
-					print(val.message,file=sys.stderr)
+					logging.error(val.message)
 					return False
 		return True

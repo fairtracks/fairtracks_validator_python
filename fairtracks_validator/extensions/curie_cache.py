@@ -6,6 +6,7 @@ import sys
 import sqlite3
 import urllib.request
 import json
+import logging
 import codecs
 import xml.dom.minidom
 from xml.dom.minidom import Node
@@ -21,6 +22,8 @@ Curie = collections.namedtuple('Curie',['id','namespace','name','pattern'])
 
 class AbstractCurieCache(object):
 	def __init__(self,filename='curie_cache.sqlite'):
+		self.logger = logging.getLogger(self.__class__.__name__)
+		
 		existsCache = os.path.exists(filename) and (os.path.getsize(filename) > 0)
 		initializeCache = not existsCache
 		
@@ -155,11 +158,11 @@ class CurieCache(AbstractCurieCache):
 					reader = codecs.getreader('utf-8')
 					registry = json.load(reader(f))
 			except urllib.error.HTTPError as he:
-				print("ERROR: Unable to fetch identifiers.org data [{0}]: {1}".format(he.code,he.reason), file=sys.stderr)
+				self.logger.error("ERROR: Unable to fetch identifiers.org data [{0}]: {1}".format(he.code,he.reason))
 			except urllib.error.URLError as ue:
-				print("ERROR: Unable to fetch identifiers.org data: {0}".format(ue.reason), file=sys.stderr)
+				self.logger.error("ERROR: Unable to fetch identifiers.org data: {0}".format(ue.reason))
 			except:
-				print("ERROR: Unable to parse identifiers.org data from "+self.REGISTRY_DUMP_LINK, file=sys.stderr)
+				self.logger.error("ERROR: Unable to parse identifiers.org data from "+self.REGISTRY_DUMP_LINK)
 			
 			if registry is not None:
 				# First round, having the update date of the whole

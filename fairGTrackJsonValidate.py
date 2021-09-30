@@ -7,6 +7,7 @@ import os
 import argparse
 import time
 import json
+import logging
 
 import yaml
 # We have preference for the C based loader and dumper, but the code
@@ -15,6 +16,9 @@ try:
 	from yaml import CLoader as YAMLLoader, CDumper as YAMLDumper
 except ImportError:
 	from yaml import Loader as YAMLLoader, Dumper as YAMLDumper
+
+from fairtracks_validator import version as ftv_version
+from fairtracks_validator.fairtracks_validator import FairGTracksValidator
 
 # This is needed to assure open suports encoding parameter
 if sys.version_info[0] == 2:
@@ -45,26 +49,50 @@ def disable_outerr_buffering():
 		sys.stdout = io.TextIOWrapper(open(sys.stdout.fileno(), 'wb', 0), write_through=True)
 		sys.stderr = io.TextIOWrapper(open(sys.stderr.fileno(), 'wb', 0), write_through=True)
 
-disable_outerr_buffering()
-
-from fairtracks_validator.fairtracks_validator import FairGTracksValidator
+DEFAULT_LOGGING_FORMAT = '%(asctime)-15s - [%(levelname)s] %(message)s'
 
 if __name__ == "__main__":
-	ap = argparse.ArgumentParser(description="Validate JSON against JSON Schemas with extensions")
+	disable_outerr_buffering()
+	
+	ap = argparse.ArgumentParser(description=f"Validate JSON against JSON Schemas with extensions (version {ftv_version})")
+	
+	ap.add_argument('--log-file', dest="logFilename", help='Store messages in a file instead of using standard error and standard output')
+	ap.add_argument('--log-format', dest='logFormat', help='Format of log messages', default=DEFAULT_LOGGING_FORMAT)
+	ap.add_argument('-q', '--quiet', dest='logLevel', action='store_const', const=logging.WARNING, help='Only show engine warnings and errors')
+	ap.add_argument('-v', '--verbose', dest='logLevel', action='store_const', const=logging.INFO, help='Show verbose (informational) messages')
+	ap.add_argument('-d', '--debug', dest='logLevel', action='store_const', const=logging.DEBUG, help='Show debug messages (use with care, as it could potentially disclose sensitive contents)')
+	
+	ap.add_argument('-V', '--version', action='version', version='%(prog)s version ' + ftv_version)
+	
 	ap.add_argument('-C','--config',dest="configFilename",help="Configuration file (used by extensions)")
 	ap.add_argument('--cache-dir',dest="cacheDir",help="Caching directory (used by extensions)")
 	
 	ap.add_argument('--report',dest="reportFilename",help="Store validation report (in JSON format) in a file")
 	ap.add_argument('--verbose-report',dest="isQuietReport",help="When this flag is enabled, the report also embeds the json contents which were validated", action='store_false', default=True)
-	ap.add_argument('-q','--quiet',dest="isVerbose",help="Quiet (no human report through stdout/stderr)", action='store_false', default=True)
 	
 	ap.add_argument('--invalidate',help="Caches are invalidated on startup", action='store_true')
 	grp = ap.add_mutually_exclusive_group()
 	grp.add_argument('--warm-up',dest="warmUp",help="Caches are warmed up on startup", action='store_const', const=True)
 	grp.add_argument('--lazy-load',dest="warmUp",help="Caches are warmed up in a lazy way", action='store_false')
-	ap.add_argument('jsonSchemaDir', metavar='json_schema', help='The JSON Schema file or directory to validate and use')
-	ap.add_argument('json_files', metavar='json_file', nargs='*',help='The JSON files or directories to be validated')
+	ap.add_argument('jsonSchemaDir', metavar='json_schema_or_dir', help='The JSON Schema file or directory to validate and use')
+	ap.add_argument('json_files', metavar='json_file_or_dir', nargs='*',help='The JSON files or directories to be validated')
 	args = ap.parse_args()
+	
+	# Setting up the logging machinery
+	loggingConfig = {
+		'format': args.logFormat
+	}
+	
+	logLevel = logging.INFO
+	if args.logLevel:
+		logLevel = args.logLevel
+	loggingConfig['level'] = logLevel
+	
+	if args.logFilename is not None:
+		loggingConfig['filename'] = args.logFilename
+	#	loggingConfig['encoding'] = 'utf-8'
+	
+	logging.basicConfig(**loggingConfig)
 	
 	# First, try loading the configuration file
 	if args.configFilename:
@@ -84,36 +112,33 @@ if __name__ == "__main__":
 	
 	fgv = FairGTracksValidator(config=local_config)
 	
-	numSchemas = fgv.loadJSONSchemas(args.jsonSchemaDir,verbose=args.isVerbose)
+	isVerbose = logLevel <= logging.INFO
+	numSchemas = fgv.loadJSONSchemas(args.jsonSchemaDir, verbose=isVerbose)
 	
 	if numSchemas > 0:
 		# Should we invalidate caches?
 		if args.invalidate:
-			if args.isVerbose:
-				print("\n* Invalidating caches.")
+			logging.info("\n* Invalidating caches.")
 			fgv.invalidateCaches()
 
 		if args.warmUp:
-			if args.isVerbose:
-				print("\n* Warming up caches...")
+			logging.info("\n* Warming up caches...")
 			t0 = time.time()
 			fgv.warmUpCaches()
 			t1 = time.time()
-			if args.isVerbose:
-				print("\t{} seconds".format(t1-t0))
+			logging.info("\t{} seconds".format(t1-t0))
 			
 			
 	if len(sys.argv) > 2:
 		if numSchemas == 0:
-			print("FATAL ERROR: No schema was successfuly loaded. Exiting...\n",file=sys.stderr)
+			logging.critical("FATAL ERROR: No schema was successfuly loaded. Exiting...\n",file=sys.stderr)
 			sys.exit(1)
 		
 		jsonFiles = tuple(args.json_files)
-		report = fgv.jsonValidate(*jsonFiles,verbose=args.isVerbose)
+		report = fgv.jsonValidate(*jsonFiles, verbose=isVerbose)
 		
 		if args.reportFilename is not None:
-			if args.isVerbose:
-				print("\n* Storing JSON report at {}".format(args.reportFilename))
+			logging.info("* Storing JSON report at {}".format(args.reportFilename))
 			if args.isQuietReport:
 				for rep in report:
 					del rep['json']
