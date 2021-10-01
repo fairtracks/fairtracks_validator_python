@@ -3,7 +3,6 @@
 
 import rfc3987
 import uritools
-from jsonschema.compat import str_types
 from jsonschema.exceptions import FormatError, ValidationError
 
 from extended_json_schema_validator.extensions.abstract_check import AbstractCustomFeatureValidator
@@ -198,7 +197,7 @@ class CurieSearch(AbstractCustomFeatureValidator):
 		if isinstance(instance,Curie):
 			return True
 		
-		if not isinstance(instance, str_types):
+		if not isinstance(instance, str):
 			return False
 		
 		parsed = rfc3987.parse(instance, rule="URI")

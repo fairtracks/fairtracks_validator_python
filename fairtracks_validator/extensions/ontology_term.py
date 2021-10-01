@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 
 import rfc3987
-from jsonschema.compat import str_types
 from jsonschema.exceptions import FormatError, ValidationError
 
 import owlready2
@@ -414,7 +413,7 @@ class OntologyTerm(AbstractCustomFeatureValidator):
 	
 	@classmethod
 	def IsTerm(cls,checker,instance):
-		if not isinstance(instance, str_types):
+		if not isinstance(instance, str):
 			return False
 		
 		# Right now we are only considering fully qualified terms, i.e. URIs
