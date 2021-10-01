@@ -271,7 +271,7 @@ class OntologyTerm(AbstractCustomFeatureValidator):
 				#ontologiesPath = os.path.join(cachePath,'ontologies')
 				#os.makedirs(ontologiesPath,exist_ok=True)
 				#owlready2.onto_path.append(ontologiesPath)
-				worldDB = owlready2.World(filename=worldDBPath, exclusive=False)
+				worldDB = owlready2.World(filename=worldDBPath, exclusive=False, read_only=not warmUp)
 				cls.TermWorlds[iri_hash] = worldDB
 			
 			# Trying to get the metadata useful for an optimal ontology download
