@@ -10,11 +10,7 @@ from .curie_cache import CurieCache, Curie
 
 import logging
 import re
-import xdg
 import os, sys
-import tempfile
-import shutil
-import atexit
 
 class CurieSearch(AbstractCustomFeatureValidator):
 	VALID_MATCHES = {
@@ -29,6 +25,10 @@ class CurieSearch(AbstractCustomFeatureValidator):
 	
 	def __init__(self, schemaURI, jsonSchemaSource='(unknown)', config={}, isRW=True):
 		super().__init__(schemaURI, jsonSchemaSource, config, isRW=isRW)
+	
+	CacheSubdir = 'CURIE'
+	CachePathProp = 'CurieCachePath'
+	CacheProp = 'CurieCache'
 	
 	@property
 	def triggerAttribute(self):
@@ -63,23 +63,8 @@ class CurieSearch(AbstractCustomFeatureValidator):
 	def needsBootstrapping(self):
 		return False
 	
-	def invalidateCaches(self):
-		self.InvalidateCurieCache(cachePath=self.config.get('cacheDir'))
-	
 	def warmUpCaches(self):
 		cache = self.GetCurieCache(cachePath=self.config.get('cacheDir'), warmUp=self.isRW)
-	
-	@classmethod
-	def InvalidateCurieCache(cls, cachePath=None):
-		if hasattr(cls,'CurieCache'):
-			cache = getattr(cls,'CurieCache')
-			delattr(cls,'CurieCache')
-			cache.invalidate()
-			del cache
-		
-		cachePath = cls.GetCurieCachePath(cachePath=cachePath)
-		delattr(cls,'CurieCachePath')
-		shutil.rmtree(cachePath,ignore_errors=True)
 	
 	def isValid(self,validator,nslist,origValue,schema):
 		found = False
@@ -154,43 +139,13 @@ class CurieSearch(AbstractCustomFeatureValidator):
 		return found, checkedPatterns
 	
 	@classmethod
-	def GetCurieCachePath(cls, cachePath = None):
-		if not hasattr(cls,'CurieCachePath'):
-			doTempDir = False
-			if cachePath is None:
-				try:
-					cachePath = xdg.BaseDirectory.save_cache_path('es.elixir.jsonValidator')
-					# Is the directory writable?
-					if not os.access(cachePath,os.W_OK):
-						doTempDir = True
-				except OSError as e:
-					# As it was not possible to create the
-					# directory at the cache path, create a
-					# temporary directory
-					doTempDir = True
-			
-			if doTempDir:
-				# The temporary directory should be
-				# removed when the application using this
-				# class finishes
-				#cachePath = tempfile.mkdtemp(prefix="curie", suffix="cache")
-				#atexit.register(shutil.rmtree, cachePath, ignore_errors=True)
-				cachePath = os.path.join(tempfile.gettempdir(),'cache_es.elixir.jsonValidator')
-				os.makedirs(cachePath, exist_ok=True)
-			
-			setattr(cls,'CurieCachePath',cachePath)
-		
-		return getattr(cls,'CurieCachePath')
-	
-	@classmethod
 	def GetCurieCache(cls, cachePath = None, warmUp=True):
-		if cachePath is None:
-			cachePath = cls.GetCurieCachePath(cachePath = cachePath)
+		cachePath = cls.GetCachePath(cachePath = cachePath)
 		
-		if not hasattr(cls,'CurieCache'):
-			setattr(cls,'CurieCache',CurieCache(filename=os.path.join(cachePath,'CURIE_cache.sqlite3'), warmUp=warmUp))
+		if not hasattr(cls, cls.CacheProp):
+			setattr(cls, cls.CacheProp, CurieCache(filename=os.path.join(cachePath,'CURIE_cache.sqlite3'), warmUp=warmUp))
 		
-		return getattr(cls,'CurieCache')
+		return getattr(cls,  cls.CacheProp)
 	
 	@classmethod
 	def IsCurie(cls,checker,instance):

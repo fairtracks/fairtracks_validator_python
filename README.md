@@ -17,7 +17,7 @@ As this Python code is relevant to several research projects, it has been split 
 ## Usage
 
 ```bash
-python jsonValidate.py --help
+python fairGTrackJsonValidate.py --help
 ```
 ```
 usage: fairGTrackJsonValidate.py [-h] [--log-file LOGFILENAME] [--log-format LOGFORMAT] [-q] [-v] [-d] [-V] [-C CONFIGFILENAME]

@@ -1,4 +1,4 @@
 # -*- coding: utf-8 -*-
 
 name = "fairtracks_validator"
-__version__ = version = '0.9.9'
+__version__ = version = '0.9.10'

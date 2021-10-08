@@ -5,15 +5,11 @@ import rfc3987
 from jsonschema.exceptions import FormatError, ValidationError
 
 import owlready2
-import xdg.BaseDirectory
 
 import os
 import urllib
 import urllib.error
 import sys
-import tempfile
-import shutil
-import atexit
 import hashlib
 
 import json
@@ -39,6 +35,9 @@ class OntologyTerm(AbstractCustomFeatureValidator):
 	def __init__(self, schemaURI, jsonSchemaSource='(unknown)', config={}, isRW=True):
 		super().__init__(schemaURI, jsonSchemaSource, config, isRW=isRW)
 		self.ontologies = []
+	
+	CacheSubdir = 'Ontologies'
+	CachePathProp = 'OntCachePath'
 	
 	@property
 	def triggerAttribute(self):
@@ -122,40 +121,13 @@ class OntologyTerm(AbstractCustomFeatureValidator):
 		for ontology in self.ontologies:
 			self.GetOntology(ontology, doReasoner=doReasoner, cachePath=cachePath, logger=self.logger, warmUp=self.isRW)
 	
-	@classmethod
-	def GetCachePath(cls):
-		doTempDir = False
-		cachePath = None
-		try:
-			cachePath = xdg.BaseDirectory.save_cache_path('es.elixir.jsonValidator')
-			# Is the directory writable?
-			if not os.access(cachePath,os.W_OK):
-				doTempDir = True
-		except OSError as e:
-			# As it was not possible to create the
-			# directory at the cache path, go to the
-			# temporary directory
-			doTempDir = True
-		
-		if doTempDir:
-			# The temporary directory should be
-			# removed when the application using this
-			# class finishes
-			#cachePath = tempfile.mkdtemp(prefix="term", suffix="cache")
-			#atexit.register(shutil.rmtree, cachePath, ignore_errors=True)
-			cachePath = os.path.join(tempfile.gettempdir(),'cache_es.elixir.jsonValidator')
-			os.makedirs(cachePath, exist_ok=True)
-		
-		return cachePath
-	
 	MetadataPaths = {}
 	
 	@classmethod
 	def GetMetadataPath(cls, iri_hash, cachePath=None):
 		metadataPath = cls.MetadataPaths.get(iri_hash)
 		if metadataPath is None:
-			if cachePath is None:
-				cachePath = cls.GetCachePath()
+			cachePath = cls.GetCachePath(cachePath=cachePath)
 			
 			metadataPath = os.path.join(cachePath,'metadata_{0}.json'.format(iri_hash))
 			cls.MetadataPaths[iri_hash] = metadataPath
@@ -168,8 +140,7 @@ class OntologyTerm(AbstractCustomFeatureValidator):
 	def GetWorldDBPath(cls, iri_hash , cachePath=None):
 		termWorldPath = cls.TermWorldsPaths.get(iri_hash)
 		if termWorldPath is None:
-			if cachePath is None:
-				cachePath = cls.GetCachePath()
+			cachePath = cls.GetCachePath(cachePath=cachePath)
 			
 			termWorldPath = os.path.join(cachePath,'owlready2_{0}.sqlite3'.format(iri_hash))
 			cls.TermWorldsPaths[iri_hash] = termWorldPath
@@ -178,10 +149,9 @@ class OntologyTerm(AbstractCustomFeatureValidator):
 	
 	@classmethod
 	def GetOntologyPath(cls, iri_hash, cachePath=None):
-		if cachePath is None:
-			cachePath = cls.GetCachePath()
+		ontCachePath = cls.GetCachePath(cachePath=cachePath)
 		
-		ontologyPath = os.path.join(cachePath,'ontology_{0}.owl'.format(iri_hash))
+		ontologyPath = os.path.join(ontCachePath,'ontology_{0}.owl'.format(iri_hash))
 		
 		return ontologyPath
 	

@@ -1,4 +1,4 @@
-extended-json-schema-validator >= 0.9.9
+extended-json-schema-validator >= 0.9.10
 # With 'format' several optional formats
 # are supported through additional libraries
 jsonschema[format] >= 3.0.0
@@ -6,6 +6,5 @@ uritools
 # Optimized version of Owlready2 needs cython
 cython
 owlready2 >= 0.23
-pyxdg
 dateparser
 pyyaml
